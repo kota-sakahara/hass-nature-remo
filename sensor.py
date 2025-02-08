@@ -1,18 +1,12 @@
 """Support for Nature Remo E energy sensor."""
 import logging
-
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.components.sensor.const import (SensorDeviceClass,
-                                                   UnitOfPower,
-                                                   UnitOfTemperature)
-
+from homeassistant.components.sensor import SensorDeviceClass
+from homeassistant.const import PERCENTAGE
 from . import DOMAIN, NatureRemoBase, NatureRemoDeviceBase
 
 _LOGGER = logging.getLogger(__name__)
 
-
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the Nature Remo E sensor."""
     if discovery_info is None:
         return
     _LOGGER.debug("Setting up sensor platform.")
@@ -25,9 +19,6 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         if appliance["type"] == "EL_SMART_METER"
     ]
     for device in devices.values():
-        # skip devices that include in appliances
-        if device["id"] in [appliance["device"]["id"] for appliance in appliances.values()]:
-            continue
         for sensor in device["newest_events"].keys():
             if sensor == "te":
                 entities.append(NatureRemoTemperatureSensor(coordinator, device))
@@ -37,112 +28,101 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 entities.append(NatureRemoIlluminanceSensor(coordinator, device))
     async_add_entities(entities)
 
-
-class NatureRemoE(NatureRemoBase, SensorEntity):
+class NatureRemoE(NatureRemoBase):
     """Implementation of a Nature Remo E sensor."""
 
     def __init__(self, coordinator, appliance):
         super().__init__(coordinator, appliance)
-        self._name = self._name.strip() + " Power"
+        self._unit_of_measurement = "W"  # 直接文字列を指定
 
     @property
     def state(self):
-        """Return the state of the sensor."""
         appliance = self._coordinator.data["appliances"][self._appliance_id]
-        smart_meter = appliance["smart_meter"]
-        echonetlite_properties = smart_meter["echonetlite_properties"]
+        echonetlite_properties = appliance["smart_meter"]["echonetlite_properties"]
         measured_instantaneous = next(
-            value["val"] for value in echonetlite_properties if value["epc"] == 231
+            v["val"] for v in echonetlite_properties if v["epc"] == 231
         )
         _LOGGER.debug("Current state: %sW", measured_instantaneous)
         return measured_instantaneous
 
     @property
     def unit_of_measurement(self):
-        """Return the unit of measurement of this entity, if any."""
-        return UnitOfPower.WATT
+        return self._unit_of_measurement
 
     @property
     def device_class(self):
-        """Return the device class."""
         return SensorDeviceClass.POWER
 
     async def async_added_to_hass(self):
-        """Subscribe to updates."""
         self.async_on_remove(
             self._coordinator.async_add_listener(self.async_write_ha_state)
         )
 
     async def async_update(self):
-        """Update the entity.
-
-        Only used by the generic entity update service.
-        """
         await self._coordinator.async_request_refresh()
 
-
-class NatureRemoTemperatureSensor(NatureRemoDeviceBase, SensorEntity):
-    """Implementation of a Nature Remo sensor."""
-
+class NatureRemoTemperatureSensor(NatureRemoDeviceBase):
     def __init__(self, coordinator, appliance):
         super().__init__(coordinator, appliance)
         self._name = self._name.strip() + " Temperature"
 
     @property
+    def unique_id(self):
+        return self._device["id"] + "-te"
+
+    @property
     def unit_of_measurement(self):
-        """Return the unit of measurement of this entity, if any."""
-        return UnitOfTemperature.CELSIUS
+        return "°C"  # 列挙が無ければ文字列で指定
 
     @property
     def state(self):
-        """Return the state of the sensor."""
         device = self._coordinator.data["devices"][self._device["id"]]
         return device["newest_events"]["te"]["val"]
 
     @property
     def device_class(self):
-        """Return the device class."""
         return SensorDeviceClass.TEMPERATURE
 
-
-class NatureRemoHumiditySensor(NatureRemoDeviceBase, SensorEntity):
-    """Implementation of a Nature Remo sensor."""
-
+class NatureRemoHumiditySensor(NatureRemoDeviceBase):
     def __init__(self, coordinator, appliance):
         super().__init__(coordinator, appliance)
         self._name = self._name.strip() + " Humidity"
 
     @property
+    def unique_id(self):
+        return self._device["id"] + "-hu"
+
+    @property
+    def unit_of_measurement(self):
+        return PERCENTAGE  # これは比較的古いバージョンでも残っている
+
+    @property
     def state(self):
-        """Return the state of the sensor."""
         device = self._coordinator.data["devices"][self._device["id"]]
         return device["newest_events"]["hu"]["val"]
 
     @property
     def device_class(self):
-        """Return the device class."""
         return SensorDeviceClass.HUMIDITY
 
-
-class NatureRemoIlluminanceSensor(NatureRemoDeviceBase, SensorEntity):
-    """Implementation of a Nature Remo sensor."""
-
+class NatureRemoIlluminanceSensor(NatureRemoDeviceBase):
     def __init__(self, coordinator, appliance):
         super().__init__(coordinator, appliance)
         self._name = self._name.strip() + " Illuminance"
 
     @property
     def unique_id(self):
-        """Return a unique ID."""
-        return self._device["id"] + "-illuminance"
+        return self._device["id"] + "-il"
+
+    @property
+    def unit_of_measurement(self):
+        return "lx"  # 列挙が無ければ文字列で指定
 
     @property
     def state(self):
-        """Return the state of the sensor."""
         device = self._coordinator.data["devices"][self._device["id"]]
         return device["newest_events"]["il"]["val"]
 
     @property
     def device_class(self):
-        """Return the device class."""
-        return SensorDeviceClass.ILLUMINANCE 
+        return SensorDeviceClass.ILLUMINANCE
