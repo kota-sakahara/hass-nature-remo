@@ -1,4 +1,3 @@
-# climate.py
 import logging
 from homeassistant.core import callback
 from homeassistant.components.climate import (
@@ -235,9 +234,17 @@ class NatureRemoAC(NatureRemoBase, ClimateEntity):
         self.async_write_ha_state()
 
     def _current_mode_temp_range(self):
-        """Return possible temperature range for current Remo AC mode."""
         if self._remo_mode not in self._modes:
             return []
         temp_range = self._modes[self._remo_mode].get("temp", [])
-        # nullが混在している場合もあるので除去
-        return [float(t) for t in temp_range if t is not None]
+        result = []
+        for t in temp_range:
+            # t is None / '' / or a real string
+            if not t:  # None や '' を弾く
+                continue
+            try:
+                result.append(float(t))
+            except ValueError:
+                # 変換できない文字列もスキップ
+                pass
+        return result
