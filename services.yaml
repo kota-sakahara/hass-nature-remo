@@ -18,6 +18,7 @@ press_light_button:
             - 'max'
             - 'favorite'
             - 'on_off'
+            - 'off'
             - 'night'
             - 'bright_up'
             - 'bright_down'
