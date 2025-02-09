@@ -5,8 +5,7 @@ from enum import Enum
 import voluptuous as vol
 from homeassistant.components.light import (
     LightEntity,
-    SUPPORT_BRIGHTNESS,
-    SUPPORT_COLOR_TEMP,
+    ColorMode,
 )
 from homeassistant.helpers import config_validation as cv, entity_platform
 from . import DOMAIN, NatureRemoBase
@@ -23,6 +22,7 @@ class LightButton(Enum):
     on = "on"
     max = "on-100"
     favorite = "on-favorite"
+    off = "off"
     on_off = "onoff"
     night = "night"
     bright_up = "bright-up"
@@ -75,10 +75,16 @@ class NatureRemoLight(NatureRemoBase, LightEntity):
     # Entity methods
 
     @property
+    def supported_color_modes(self) -> set[ColorMode] | None:
+        """Return the color modes supported by the light."""
+        return {ColorMode.ONOFF} # Indicate only on/off is supported
+
+    @property
     def assumed_state(self):
         """Return True if unable to access real state of the entity."""
         # Remo does return light.state however it doesn't seem to be correct
-        # in my experience.
+        # in my experience. This will cause Home Assistant to display on/off 
+        # buttons rather than a toggle switch by default
         return True
 
     # ToggleEntity methods
@@ -95,28 +101,21 @@ class NatureRemoLight(NatureRemoBase, LightEntity):
 
     async def async_turn_off(self, **kwargs):
         """Turn device off."""
-        await self._post({"button": "onoff"})
+        if "onoff" in self._buttons: # Use onoff toggle for lights with this
+            await self._post({"button": "onoff"})
+        else: # Otherwise use off button
+            await self._post({"button": "off"})
         self._set_on(False)
 
     # LightEntity methods
-
-    @property
-    def supported_features(self):
-        """Flag supported features."""
-        # Even though the IR remote of the light may support adjusting
-        # the brightness and color temperature, it's only ever by 1 grade
-        # and we don't know how many grades there are, so we can't even
-        # map the grades into anything useful.
-        return 0
 
     @property
     def state_attributes(self):
         """Return state attributes."""
         if not self.is_on:
             return None
-
         return {ATTR_IS_NIGHT: self._is_night}
-
+        
     # own methods
 
     async def _post(self, data):
@@ -130,8 +129,9 @@ class NatureRemoLight(NatureRemoBase, LightEntity):
     async def async_press_light_button(self, service_call):
         button = LightButton(service_call.data["button_name"])
         await self._post({"button": button.value})
-        if button == LightButton.on_off and self._is_on \
-                or button == LightButton.night and self._is_night:
+        # Handle lights with discrete on/off buttons or single onoff toggle
+        if button in (LightButton.off, LightButton.night) or \
+            (button == LightButton.onoff and self._is_on):
             self._set_on(False)
         else:
             self._set_on(True, button == LightButton.night)
