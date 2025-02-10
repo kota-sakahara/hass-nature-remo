@@ -131,7 +131,7 @@ class NatureRemoLight(NatureRemoBase, LightEntity):
         await self._post({"button": button.value})
         # Handle lights with discrete on/off buttons or single onoff toggle
         if button in (LightButton.off, LightButton.night) or \
-            (button == LightButton.onoff and self._is_on):
+            (button == LightButton.on_off and self._is_on):
             self._set_on(False)
         else:
             self._set_on(True, button == LightButton.night)
