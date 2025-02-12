@@ -19,12 +19,12 @@ Yet another [Home Assistant](https://www.home-assistant.io) component for [Natur
 - [x] Energy Sensor (Nature Remo E/E Lite)
   - [x] Fetch current power usage
 - [ ] Switch
-- [ ] Light
+- [x] Light
 - [ ] TV
 - [x] Others
   - [x] Fetch sensor data
 
-Tested on Home Assistant Core 2021.3.3 on Docker
+Tested on Home Assistant Core 2025.2.0 on Docker
 
 ## Installation
 
